@@ -853,7 +853,9 @@ function toggleBenchmarks() {
 // ─── CONNECT ───
 function connect() {
   var url = document.getElementById("urlInput").value.trim();
-  var name = document.getElementById("athleteInput").value.trim();
+  // Clean up the typed name: trim + collapse internal whitespace.
+  // The Apps Scripts also fuzzy-match (case/accents/typos) on the server side.
+  var name = document.getElementById("athleteInput").value.trim().replace(/\s+/g, " ");
   if (!name) { alert("Please enter an athlete name."); return; }
   if (!url) { url = localStorage.getItem(MATCH_SCRIPT_KEY) || DEFAULT_MATCH_URL; }
 
@@ -909,6 +911,12 @@ function loadMatchData() {
     if (data.error) {
       document.getElementById("tab-match").innerHTML = '<div class="error-msg">' + data.error + '</div>';
       return;
+    }
+    // If the server fuzzy-matched a different name, silently use the canonical one.
+    if (data.athlete && data.athlete !== athleteName) {
+      athleteName = data.athlete;
+      var elAthName = document.getElementById("athName");
+      if (elAthName) elAthName.textContent = athleteName;
     }
     renderMatchDashboard(data.matches || []);
   })
@@ -1143,6 +1151,12 @@ function loadWeeklyData() {
       document.getElementById("weeklyContent").innerHTML = '<div class="error-msg">' + data.error + '</div>';
       document.getElementById("weeklyContent").style.display = "block";
       return;
+    }
+    // If the server fuzzy-matched a different name, silently use the canonical one.
+    if (data.athlete && data.athlete !== athleteName) {
+      athleteName = data.athlete;
+      var elAthName2 = document.getElementById("athName");
+      if (elAthName2) elAthName2.textContent = athleteName;
     }
     // Script returns "history" array with camelCase keys — normalize to snake_case
     var raw = data.history || data.entries || [];
