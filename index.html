@@ -438,21 +438,54 @@ body {
 /* ─── RESPONSIVE ─── */
 @media (max-width: 768px) {
   .chart-row { grid-template-columns: 1fr; }
-  .hero-content { padding: 20px; }
-  .hero-athlete { flex-direction: column; text-align: center; }
+  .hero-content { padding: 16px; }
+  .hero-athlete { flex-direction: column; text-align: center; gap: 12px; }
   .athlete-info h2 { font-size: 1.35rem; }
   .athlete-meta { justify-content: center; }
-  .hero-topbar { margin-bottom: 20px; }
+  .hero-topbar { margin-bottom: 16px; }
+  .hero-logo img { width: 64px; height: 64px; }
   .hero-logo-text { display: none; }
-  .stat-strip { grid-template-columns: repeat(3, 1fr); }
-  .content { padding: 16px; }
-  .card { padding: 16px; }
-  .summary-grid { grid-template-columns: 1fr 1fr; }
+  .athlete-photo, .athlete-initials { width: 64px; height: 64px; font-size: 1.3rem; }
+
+  .stat-strip { grid-template-columns: repeat(3, 1fr); padding: 4px 0; }
+  .stat-item { padding: 12px 8px; }
+  .stat-value { font-size: 1.15rem; }
+  .stat-label { font-size: 0.58rem; letter-spacing: 0.5px; }
+
+  .content { padding: 12px; }
+  .card { padding: 14px; margin-bottom: 14px; }
+  .card-title { font-size: 0.82rem; }
+  .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .summary-item { padding: 14px 14px; }
+  .summary-item .value { font-size: 1rem; }
+
+  /* Tabs become horizontally scrollable so they don't wrap or get cut off */
+  .tab-nav { overflow-x: auto; padding: 0 12px; -webkit-overflow-scrolling: touch; }
+  .tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn { white-space: nowrap; padding: 12px 16px; font-size: 0.8rem; }
+
+  /* Benchmark toggle wraps cleanly on small screens */
+  .benchmark-toggle { width: 100%; flex-wrap: wrap; padding: 10px 14px; font-size: 0.75rem; }
+  .benchmark-badge, .benchmark-pos { font-size: 0.6rem; }
+
+  /* Slightly shorter charts so they fit in the viewport */
+  .chart-container { height: 240px; }
+
+  /* Setup card */
+  .setup-card { padding: 32px 24px; }
 }
+
 @media (max-width: 480px) {
   .stat-strip { grid-template-columns: repeat(2, 1fr); }
   .summary-grid { grid-template-columns: 1fr; }
-  .tab-btn { padding: 10px 12px; font-size: 0.8rem; }
+  .tab-btn { padding: 10px 12px; font-size: 0.78rem; }
+  .hero-logo img { width: 52px; height: 52px; }
+  .athlete-info h2 { font-size: 1.2rem; }
+  .athlete-photo, .athlete-initials { width: 56px; height: 56px; }
+  .chart-container { height: 220px; }
+  .setup-card { padding: 28px 20px; }
+  .setup-card h2 { font-size: 1.3rem; }
+  .meta-tag { font-size: 0.62rem; padding: 3px 10px; }
 }
 
 /* ─── BENCHMARKS ─── */
@@ -824,29 +857,14 @@ function toggleBenchmarks() {
   showBenchmarks = document.getElementById("benchToggle").checked;
   var elBI = document.getElementById("benchmarkInfo");
   if (elBI) elBI.style.display = showBenchmarks ? "block" : "none";
-  // Destroy and rebuild charts with/without benchmarks
+  // Destroy and rebuild only the MATCH charts. The Weekly Check-In tab no longer
+  // uses benchmarks (to avoid biasing self-reported wellness data), so we leave it alone.
   if (_cachedMatches) {
-    // Destroy match charts
     ["_chartPerf","_chartOff","_chartDef","_chartRadar"].forEach(function(k) {
       if (window[k]) { window[k].destroy(); window[k] = null; }
     });
     document.getElementById("matchTable").innerHTML = "";
     renderMatchDashboard(_cachedMatches);
-  }
-  if (_cachedWeeklyEntries) {
-    ["chartPhysical","chartMental","chartNutrition","_chartWeeklyRadar"].forEach(function(k) {
-      var key = k.startsWith("_") ? k : null;
-      // For canvas-based charts, get from Chart.js registry
-      var canvasId = k.startsWith("_") ? k.substring(1) : k;
-      var canvas = document.getElementById(canvasId);
-      if (canvas) {
-        var chartInstance = Chart.getChart(canvas);
-        if (chartInstance) chartInstance.destroy();
-      }
-    });
-    if (window._chartWeeklyRadar) { window._chartWeeklyRadar.destroy(); window._chartWeeklyRadar = null; }
-    document.getElementById("weeklyHeatmap").innerHTML = "";
-    renderWeeklyDashboard(_cachedWeeklyEntries);
   }
 }
 
@@ -1266,7 +1284,10 @@ function renderWeeklyDashboard(entries) {
   });
 
   // ─── Radar — Current Profile ───
-  var weeklyBenchData = INDICATORS.map(i => getWeeklyBenchmark(i.key, i.invert));
+  // NOTE: Elite Average benchmarks are intentionally NOT shown for weekly check-in data.
+  // Self-reported wellness metrics (sleep, fatigue, hydration, etc.) are vulnerable to
+  // social-desirability bias if athletes can see what "elite" looks like — they may
+  // inflate their answers to match. We keep benchmarks only on objective match stats.
   var weeklyRadarDatasets = [{
     label: "Current Week",
     data: INDICATORS.map(i => getVal(latest, i.key, i.invert)),
@@ -1276,18 +1297,6 @@ function renderWeeklyDashboard(entries) {
     pointBackgroundColor: "#dc2626",
     pointRadius: 3
   }];
-  if (showBenchmarks) {
-    weeklyRadarDatasets.push({
-      label: "Elite Average",
-      data: weeklyBenchData,
-      backgroundColor: "rgba(156,163,175,0.08)",
-      borderColor: "#9ca3af",
-      borderWidth: 2,
-      borderDash: [6, 4],
-      pointBackgroundColor: "#9ca3af",
-      pointRadius: 2
-    });
-  }
   window._chartWeeklyRadar = new Chart(document.getElementById("chartWeeklyRadar"), {
     type: "radar",
     data: {
@@ -1296,7 +1305,7 @@ function renderWeeklyDashboard(entries) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: showBenchmarks, labels: { usePointStyle: true, padding: 12, font: { family: "Inter", size: 11 } } } },
+      plugins: { legend: { display: false } },
       scales: { r: { beginAtZero: true, max: 10, ticks: { stepSize: 2, font: { family: "Inter", size: 10 } }, pointLabels: { font: { family: "Inter", size: 10 } }, grid: { color: "#e2e8f0" } } }
     }
   });
